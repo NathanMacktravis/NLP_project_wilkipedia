@@ -1,25 +1,35 @@
 import requests
 import csv
+from datetime import datetime
 
 def fetch_article_details(page_id):
     url = 'https://en.wikipedia.org/w/api.php'
     params = {
         'action': 'query',
         'pageids': page_id,
-        'prop': 'extracts|pageimages',
+        'prop': 'extracts|info|extlinks|revisions',
         'exintro': True,
         'explaintext': True,
-        'piprop': 'original',
+        'inprop': 'url',
+        'rvprop': 'timestamp',
+        'rvslots': 'main',
+        'ellimit': 'max',
         'format': 'json',
     }
     response = requests.get(url, params=params)
     data = response.json()
     page = data['query']['pages'][page_id]
+    
+    # Convert the timestamp to a readable format
+    timestamp = page['revisions'][0]['timestamp']
+    publication_date = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%SZ').date()
+
     return {
         'title': page.get('title'),
-        'link': f"https://en.wikipedia.org/?curid={page_id}",
+        'url': page.get('fullurl'),
         'extract': page.get('extract'),
-        'image': page.get('original', {}).get('source') if 'original' in page else 'No image available'
+        'publication_date': publication_date,
+        'references': [link['*'] for link in page.get('extlinks', [])]  # List of external links
     }
 
 def search_wikipedia_articles(topic):
@@ -29,10 +39,10 @@ def search_wikipedia_articles(topic):
         'list': 'search',
         'srsearch': topic,
         'format': 'json',
-        'srlimit': 10,  # On peut ajuster le nombre d'articles à récupérer
+        'srlimit': 100,  # The parameter to adjust the number of articles to retrieve
     }
     headers = {
-        'User-Agent': 'nathan-wilfried.wandji-tabeko@efrei.net'
+        'User-Agent': 'nathan-wilfried.wandji-tabeko@efrei.net'  
     }
     response = requests.get(url, headers=headers, params=params)
     search_results = response.json()['query']['search']
@@ -44,11 +54,11 @@ def search_wikipedia_articles(topic):
         articles.append(article_details)
     
     # Write to CSV
-    with open('music_articles.csv', 'w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=['title', 'link', 'extract', 'image'])
+    with open('wikipedia_articles.csv', 'w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=['title', 'url', 'extract', 'publication_date', 'references'])
         writer.writeheader()
         for article in articles:
             writer.writerow(article)
 
-# Je lance la recherche d'articles sur le thème de la musique (Après je pourrai le faire pour d'autres thèmes si vous voulez)
-search_wikipedia_articles('music')
+# Use of the function
+search_wikipedia_articles('animals')
